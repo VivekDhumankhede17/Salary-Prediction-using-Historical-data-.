@@ -1,48 +1,73 @@
 import streamlit as st
 import pandas as pd
-import pickle
+import joblib
+import numpy as np
 
-# Load the trained model
-# Make sure 'best_model.pkl' is in the same directory as app.py or provide the correct path
-with open('random_forest_regressor_model.pkl', 'rb') as file:
-    model = pickle.load(file)
+# Load the best model and column order
+best_model = joblib.load('random_forest_regressor_model.pkl')
+X_train_columns = joblib.load('label_encoders.pkl')
 
-# Streamlit App Title
 st.title('Salary Prediction App')
-st.write('Enter the details below to predict the salary.')
+st.write('Enter employee details to predict their salary.')
 
-# Input fields for the features
-# Note: The LabelEncoder mappings are assumed to be consistent with training.
-# For a robust app, you would save the LabelEncoders as well.
-
-gender_options = {'Male': 1, 'Female': 0} # Based on your Label Encoding
-education_options = {
-    "Bachelor's": 0,
-    "Master's": 1,
-    "PhD": 2
-} # Based on your Label Encoding
-
+# Input widgets for user features
 age = st.slider('Age', 18, 65, 30)
-gender = st.selectbox('Gender', list(gender_options.keys()))
-education_level = st.selectbox('Education Level', list(education_options.keys()))
-years_of_experience = st.slider('Years of Experience', 0, 40, 5)
+years_of_experience = st.slider('Years of Experience', 0.0, 40.0, 5.0)
 
-# Job Title is more complex due to many categories. For simplicity, we'll use a placeholder or assume fixed values for now.
-# In a real-world scenario, you would have a more sophisticated way to handle many categories.
-# For this demo, let's assume 'Software Engineer' is the most common or a default.
-# The actual encoded value for 'Software Engineer' was 159. Adjust if needed.
-# For a full application, you'd need the saved label_encoder for 'Job Title'.
-job_title = st.number_input('Job Title Encoded (e.g., 159 for Software Engineer)', min_value=0, max_value=200, value=159)
+gender = st.selectbox('Gender', ['Male', 'Female', 'Other'])
+education_level = st.selectbox('Education Level', ['Bachelor\'s Degree', 'Master\'s Degree', 'PhD', 'High School'])
 
-# Preprocess input
-gender_encoded = gender_options[gender]
-education_encoded = education_options[education_level]
+# For Job Title, we will create a selectbox with a few common titles.
+# In a real application, you would populate this with all unique job titles from your training data.
+job_title_options = [
+    'Software Engineer',
+    'Data Scientist',
+    'Project Manager',
+    'Marketing Analyst',
+    'HR Manager',
+    'Sales Representative',
+    'Accountant',
+    'Financial Analyst',
+    'UX Designer',
+    'Operations Manager',
+    'IT Support Specialist',
+    'Teacher'
+]
+job_title = st.selectbox('Job Title', job_title_options)
 
-# Create a DataFrame for prediction
-input_data = pd.DataFrame([[age, gender_encoded, education_encoded, job_title, years_of_experience]],
-                            columns=['Age', 'Gender', 'Education Level', 'Job Title', 'Years of Experience'])
-
-# Predict button
 if st.button('Predict Salary'):
-    prediction = model.predict(input_data)[0]
-    st.success(f'Predicted Salary: ${prediction:,.2f}')
+    # Create a DataFrame for the new input data
+    input_data = pd.DataFrame({
+        'Age': [age],
+        'Years of Experience': [years_of_experience],
+        'Gender': [gender],
+        'Education Level': [education_level],
+        'Job Title': [job_title]
+    })
+
+    # One-hot encode categorical features (mimic preprocessing during training)
+    # Create a template DataFrame with all possible one-hot encoded columns from X_train_columns
+    # This ensures consistency in column order and presence
+    processed_input = pd.DataFrame(0, index=[0], columns=X_train_columns)
+
+    # Fill in numerical features
+    processed_input['Age'] = age
+    processed_input['Years of Experience'] = years_of_experience
+
+    # Fill in one-hot encoded categorical features
+    gender_col = f'Gender_{gender}'
+    if gender_col in processed_input.columns: # Check if column exists, as 'Other' might not always be present if not in training data
+        processed_input[gender_col] = 1
+
+    education_col = f'Education Level_{education_level}'
+    if education_col in processed_input.columns:
+        processed_input[education_col] = 1
+
+    job_title_col = f'Job Title_{job_title}'
+    if job_title_col in processed_input.columns:
+        processed_input[job_title_col] = 1
+
+    # Make prediction
+    predicted_salary = best_model.predict(processed_input)[0]
+
+    st.success(f'Predicted Salary: ${predicted_salary:,.2f}')
