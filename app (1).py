@@ -5,7 +5,7 @@ import joblib
 
 
 # Load the trained Random Forest Regressor model
-model = joblib.load('app(1).py')
+model = joblib.load('model_building_2.py')
 
 # Load the label encoders
 label_encoders = joblib.load('label_encoders.pkl')
